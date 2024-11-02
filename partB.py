@@ -45,9 +45,6 @@ mu = np.mean(x, 0)
 sigma = np.std(x, 0)
 x = (x - mu) / sigma
 
-scaler = MinMaxScaler()
-x = scaler.fit_transform(x)
-
 x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_state=42)
 
 K = 10
@@ -100,11 +97,26 @@ for i, (train_index_outer, test_index_outer) in enumerate(KF.split(x_train)):
         base_values_inner.append(base_inner)
 
         # RLR model
-        lambdas = np.power(10.0, range(-5, 9))
-        opt_val_err, opt_lambda, mean_w_vs_lambda, train_err_vs_lambda, test_err_vs_lambda = rlr_validate(x_train_inner, y_train_inner, lambdas, K_inner)
-        opt_lambda = lambdas[np.argmin(test_err_vs_lambda)]
-        Lmodel_values_inner.append(np.min(test_err_vs_lambda)) 
+        # lambdas = np.power(10.0, range(-5, 9))
+        # lambdas = np.power(10.0, np.arange(-2, 1, 0.5))
+        # lambdas = np.power(10.0, np.arange(0, 10, 0.5)) 
+        lambdas = np.power(10.0, np.arange(1, 2.5, 0.1))  
+
+        opt_val_err, opt_lambda, mean_w_vs_lambda, train_err_vs_lambda, test_err_vs_lambda = rlr_validate(
+        x_train_inner, y_train_inner, lambdas, K_inner
+        )
+
+        mu_outer = np.mean(x_train_outer[:, 1:], 0)
+        sigma_outer = np.std(x_train_outer[:, 1:], 0)
+        x_train_outer[:, 1:] = (x_train_outer[:, 1:] - mu_outer) / sigma_outer
+        x_test_outer[:, 1:] = (x_test_outer[:, 1:] - mu_outer) / sigma_outer
+        
+        Error_test_rlr = (
+        np.square(y_test_outer - x_test_outer @ mean_w_vs_lambda[:, np.argmin(test_err_vs_lambda)].T).sum(axis=0) / y_test_outer.shape[0]
+        )
+
         Lmodel_lamda_inner.append(opt_lambda)
+        Lmodel_values_inner.append(Error_test_rlr)
 
         # ANN models
         X_train_tensor = torch.Tensor(x_train_inner)
@@ -114,7 +126,7 @@ for i, (train_index_outer, test_index_outer) in enumerate(KF.split(x_train)):
         # ANN1
         best_ann1_accuracy = 0
         best_n_hidden_units_ann1 = 1
-        for n_hidden_units in [1, 3, 4, 8]: 
+        for n_hidden_units in [1, 30, 80, 150]: 
             modelANN = lambda: torch.nn.Sequential(
                 torch.nn.Linear(x.shape[1], n_hidden_units), 
                 torch.nn.Tanh(), 
@@ -128,14 +140,14 @@ for i, (train_index_outer, test_index_outer) in enumerate(KF.split(x_train)):
             y_val_pred_ANN = net1(X_val_tensor)
             y_val_pred_classes = np.argmax(y_val_pred_ANN.detach().numpy(), axis=1)
             
-            ann_mse_inner = np.mean((y_val_inner - y_val_pred_classes)**2)
+            ann_error_inner = np.mean(y_val_inner != y_val_pred_classes) 
 
             accuracy_ann = np.mean(y_val_inner == y_val_pred_classes)  
             if accuracy_ann > best_ann1_accuracy:
                 best_ann_accuracy = accuracy_ann
                 best_n_hidden_units_ann1 = n_hidden_units
 
-        ANN_values_inner.append(ann_mse_inner) 
+        ANN_values_inner.append(ann_error_inner) 
 
     # Calculate average metrics for the inner loop
     base_values_outer.append(np.mean(base_values_inner))
