@@ -149,8 +149,8 @@ for i, (train_index_outer, test_index_outer) in enumerate(KF.split(x_train)):
     baseline_errors.append(np.mean(base_values_inner))
 
 
-print("Outer Fold|Optimal Hidden Units|Optimal Lambda|ANN Error|Linear Error|Baseline Error")
-print("-" * 80)  # Separator
+print("Outer Fold|Optimal Hidden Units|ANN Error|Optimal Lambda|Linear Error|Baseline Error")
+print("-" * 100) 
 for i in range(K):
     print(f"{i+1:9d}|{optimal_hidden_units[i]:19d}|{ann_errors[i]:9.4f}|{optimal_lambdas[i]:14.4f}|{linear_errors[i]:12.4f}|{baseline_errors[i]:14.4f}")
 
