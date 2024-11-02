@@ -50,7 +50,7 @@ x = scaler.fit_transform(x)
 
 x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_state=42)
 
-K = 2
+K = 10
 KF = KFold(K, shuffle=True)
 base_values_outer = []
 Lmodel_values_outer = []
@@ -69,7 +69,7 @@ modelANN = lambda: torch.nn.Sequential(
 )
 
 loss_fn = torch.nn.CrossEntropyLoss()
-max_iter = 10000
+max_iter = 100
 
 # Outer cross-validation loop
 for i, (train_index_outer, test_index_outer) in enumerate(KF.split(x_train)):
@@ -79,7 +79,7 @@ for i, (train_index_outer, test_index_outer) in enumerate(KF.split(x_train)):
     y_train_outer, y_test_outer = y_train[train_index_outer], y_train[test_index_outer]
  
     # Inner cross-validation
-    K_inner = 2  # Number of inner folds
+    K_inner = 10  # Number of inner folds
     KF_inner = KFold(K_inner, shuffle=True)
 
     base_values_inner = []
@@ -114,7 +114,7 @@ for i, (train_index_outer, test_index_outer) in enumerate(KF.split(x_train)):
         # ANN1
         best_ann1_accuracy = 0
         best_n_hidden_units_ann1 = 1
-        for n_hidden_units in [1, 3, 4]: 
+        for n_hidden_units in [1, 3, 4, 8]: 
             modelANN = lambda: torch.nn.Sequential(
                 torch.nn.Linear(x.shape[1], n_hidden_units), 
                 torch.nn.Tanh(), 
