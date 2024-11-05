@@ -47,7 +47,7 @@ x = (x - mu) / sigma
 
 x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_state=42)
 
-K = 10
+K = 2
 KF = KFold(K, shuffle=True)
 base_values_outer = []
 Lmodel_values_outer = []
@@ -66,7 +66,7 @@ modelANN = lambda: torch.nn.Sequential(
 )
 
 loss_fn = torch.nn.CrossEntropyLoss()
-max_iter = 100
+max_iter = 1000
 
 # Outer cross-validation loop
 for i, (train_index_outer, test_index_outer) in enumerate(KF.split(x_train)):
@@ -76,12 +76,13 @@ for i, (train_index_outer, test_index_outer) in enumerate(KF.split(x_train)):
     y_train_outer, y_test_outer = y_train[train_index_outer], y_train[test_index_outer]
  
     # Inner cross-validation
-    K_inner = 10  # Number of inner folds
+    K_inner = 2  # Number of inner folds
     KF_inner = KFold(K_inner, shuffle=True)
 
     base_values_inner = []
     Lmodel_values_inner = []
     ANN_values_inner = []
+    Error_train_nofeatures = np.empty((K_inner, 1))
 
     # Inner cross-validation loop
     for j, (train_index_inner, val_index_inner) in enumerate(KF_inner.split(x_train_outer)):
@@ -92,9 +93,14 @@ for i, (train_index_outer, test_index_outer) in enumerate(KF.split(x_train)):
 
         # Compute the baseline
         values, counts = np.unique(y_train_inner, return_counts=True)
-        y_pred_baseline_inner = np.full(len(y_val_inner), values[np.argmax(counts)])
-        base_inner = np.sum(y_pred_baseline_inner != y_val_inner) / len(y_val_inner)
-        base_values_inner.append(base_inner)
+        # y_pred_baseline_inner = np.full(len(y_val_inner), values[np.argmax(counts)])
+        base_inner = np.mean(y_train_inner)
+        # base_inner = np.sum(y_pred_baseline_inner != y_val_inner) / len(y_val_inner)
+        # Error_test_rlr = (np.square(y_test_outer - x_test_outer @ mean_w_vs_lambda[:, np.argmin(test_err_vs_lambda)].T).sum(axis=0) / y_test_outer.shape[0])
+        Error_train_nofeatures[j] = (np.square(y_train_inner - y_train_inner.mean()).sum(axis=0) / y_train_inner.shape[0])
+        base_values_inner.append(Error_train_nofeatures[j])
+
+
 
         # RLR model
         # lambdas = np.power(10.0, range(-5, 9))
@@ -106,14 +112,12 @@ for i, (train_index_outer, test_index_outer) in enumerate(KF.split(x_train)):
         x_train_inner, y_train_inner, lambdas, K_inner
         )
 
-        mu_outer = np.mean(x_train_outer[:, 1:], 0)
-        sigma_outer = np.std(x_train_outer[:, 1:], 0)
-        x_train_outer[:, 1:] = (x_train_outer[:, 1:] - mu_outer) / sigma_outer
-        x_test_outer[:, 1:] = (x_test_outer[:, 1:] - mu_outer) / sigma_outer
+        mu_inner = np.mean(x_train_inner[:, 1:], 0)
+        sigma_inner = np.std(x_train_inner[:, 1:], 0)
+        x_train_inner[:, 1:] = (x_train_inner[:, 1:] - mu_inner) / sigma_inner
+
         
-        Error_test_rlr = (
-        np.square(y_test_outer - x_test_outer @ mean_w_vs_lambda[:, np.argmin(test_err_vs_lambda)].T).sum(axis=0) / y_test_outer.shape[0]
-        )
+        Error_test_rlr = (np.square(y_train_inner - x_train_inner @ mean_w_vs_lambda[:, np.argmin(test_err_vs_lambda)].T).sum(axis=0) / y_train_inner.shape[0])
 
         Lmodel_lamda_inner.append(opt_lambda)
         Lmodel_values_inner.append(Error_test_rlr)
@@ -155,7 +159,7 @@ for i, (train_index_outer, test_index_outer) in enumerate(KF.split(x_train)):
     ANN_values_outer.append(np.mean(ANN_values_inner))
 
     optimal_hidden_units.append(best_n_hidden_units_ann1)
-    optimal_lambdas.append(np.mean(Lmodel_lamda_inner))  # Average lambda from inner folds
+    optimal_lambdas.append(np.mean(Lmodel_lamda_inner))
     ann_errors.append(np.mean(ANN_values_inner))
     linear_errors.append(np.mean(Lmodel_values_inner))
     baseline_errors.append(np.mean(base_values_inner))
