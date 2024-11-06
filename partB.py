@@ -1,23 +1,17 @@
 import numpy as np
-import importlib_resources
-import pandas as pd
+
 from ucimlrepo import fetch_ucirepo 
 
 # fold
 from sklearn.model_selection import train_test_split, KFold
-from sklearn.preprocessing import MinMaxScaler
+
 
 # linear model
 import sklearn.linear_model as lm
 
 # ANN
 import torch
-from dtuimldmtools import (
-    draw_neural_net,
-    train_neural_net,
-    visualize_decision_boundary,
-    rlr_validate,
-)
+from dtuimldmtools import train_neural_net
 
 # fetch dataset 
 glass_identification = fetch_ucirepo(id=42) 
@@ -39,7 +33,7 @@ x = (x - mu) / sigma
 
 x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_state=42)
 
-K = 3  # number of folds
+K = 10  # number of folds
 KF = KFold(K, shuffle=True)
 
 baseline_errors = []
@@ -50,13 +44,11 @@ optimal_hidden_units = []
 optimal_lambdas = []
 ann_errors = []
 linear_errors = []
-baseline_errors = []
 
 lambdas = np.power(10.0, np.arange(1, 2.5, 0.1)) 
 num_classes = 7
 
 # Define the model structure
-# n_hidden_units = 3  # number of hidden units in the signle hidden layer
 modelANN = lambda: torch.nn.Sequential(
     torch.nn.Linear(x.shape[1], 1),  # M features to H hiden units
     # 1st transfer function, either Tanh or ReLU:
@@ -76,7 +68,7 @@ for i, (train_index_outer, test_index_outer) in enumerate(KF.split(x_train)):
     y_train_outer, y_test_outer = y_train[train_index_outer], y_train[test_index_outer]
  
     # Inner cross-validation
-    K_inner = 2  # Number of inner folds
+    K_inner = 10  # Number of inner folds
     KF_inner = KFold(K_inner, shuffle=True)
 
     base_values_inner = []
@@ -197,10 +189,6 @@ print("-" * 100)
 for i in range(K):
     print(f"{i+1:9d}|{optimal_hidden_units[i]:19d}|{ann_errors[i]:9.4f}|{optimal_lambdas[i]:14.4f}|{linear_errors[i]:12.4f}|{baseline_errors[i]:14.4f}")
 
-# print("Outer Fold|Optimal Lambda|Linear Error|test|Baseline Error")
-# print("-" * 100) 
-# for i in range(K):
-#     print(f"{i+1:9d}||{optimal_lambdas[i]:14.4f}|{linear_errors[i]:12.4f}|{baseline_errors[i]:14.4f}")
 
 
 Lmodel_values = np.array(linear_errors)
@@ -216,7 +204,6 @@ base_values = np.array(base_values_outer)
 print("base values:", base_values)
 base_baseline = np.mean(base_values)
 print("average Baseline:", base_baseline)
-
 
 # ANN_values = np.array(ANN_values_outer)
 # print("ANN values:", ANN_values)
