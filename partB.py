@@ -1,4 +1,5 @@
 import numpy as np
+import matplotlib.pyplot as plt
 
 from ucimlrepo import fetch_ucirepo 
 
@@ -11,7 +12,7 @@ import sklearn.linear_model as lm
 
 # ANN
 import torch
-from dtuimldmtools import train_neural_net
+from dtuimldmtools import (train_neural_net, mcnemar, ttest_twomodels)
 
 # fetch dataset 
 glass_identification = fetch_ucirepo(id=42) 
@@ -79,6 +80,11 @@ for i, (train_index_outer, test_index_outer) in enumerate(KF.split(x_train)):
     val_error = np.empty((K_inner, len(lambdas)))
     optimal_lambdas_inner = []
 
+    y_pred_ann_outer = []
+    y_pred_linear_outer = []
+    y_pred_baseline_outer = []
+    y_true_outer = [] 
+
     # Inner cross-validation loop
     for j, (train_index_inner, val_index_inner) in enumerate(KF_inner.split(x_train_outer)):
         print(f"  Inner fold: {j+1}/{K_inner}")
@@ -94,6 +100,7 @@ for i, (train_index_outer, test_index_outer) in enumerate(KF.split(x_train)):
         # Compute the baseline
         values, counts = np.unique(y_train_inner, return_counts=True)
         base_inner = np.mean(y_train_inner)
+        y_pred_baseline_inner = np.full(y_val_inner.shape, base_inner) 
         Error_train_nofeatures[j] = (np.square(y_train_inner - y_train_inner.mean()).sum(axis=0) / y_train_inner.shape[0])
         base_values_inner.append(Error_train_nofeatures[j])
 
@@ -112,12 +119,16 @@ for i, (train_index_outer, test_index_outer) in enumerate(KF.split(x_train)):
             train_error[j, l] = np.power(y_train_inner - x_train_inner @ w[:, j, l].T, 2).mean(axis=0)
             val_error[j, l] = np.power(y_val_inner - x_val_inner @ w[:, j, l].T, 2).mean(axis=0) 
 
+
         # Find best value of lambda for current CV fold
         opt_lambda_idx = np.argmin(np.mean(val_error[j, :]))
         opt_lambda = lambdas[opt_lambda_idx]
         opt_val_err = np.min(val_error[j, :])
         Lmodel_values_inner.append(opt_val_err) 
         optimal_lambdas_inner.append(opt_lambda)
+
+        best_linear_model_inner = lm.Ridge(alpha=opt_lambda).fit(x_train_inner, y_train_inner)  # Train model
+        y_pred_linear_inner = best_linear_model_inner.predict(x_val_inner)
 
         # ANN models
         X_train_tensor = torch.Tensor(x_train_inner)
@@ -148,6 +159,11 @@ for i, (train_index_outer, test_index_outer) in enumerate(KF.split(x_train)):
                 best_ann_accuracy = accuracy_ann
                 best_n_hidden_units_ann1 = n_hidden_units
 
+            y_pred_ann_outer.extend(y_val_pred_classes)
+            y_pred_linear_outer.extend(y_pred_linear_inner)
+            y_pred_baseline_outer.extend(y_pred_baseline_inner)
+            y_true_outer.extend(y_val_inner)
+
         ANN_values_inner.append(ann_error_inner) 
 
     best_lambda_outer = np.mean(optimal_lambdas_inner)
@@ -173,6 +189,7 @@ for i, (train_index_outer, test_index_outer) in enumerate(KF.split(x_train)):
     y_test_pred_classes = np.argmax(y_test_pred_ANN.detach().numpy(), axis=1)
     ann_error_outer = np.mean(y_test_outer != y_test_pred_classes) 
     ann_errors.append(ann_error_outer)
+    
 
     # Calculate average metrics for the inner loop
     base_values_outer.append(np.mean(base_values_inner))
@@ -209,3 +226,27 @@ print("average Baseline:", base_baseline)
 # print("ANN values:", ANN_values)
 # ANN_avg = np.mean(ANN_values)
 # print("average ANN :", ANN_avg)
+
+
+y_true_outer = np.array(y_true_outer)
+y_pred_ann_outer = np.array(y_pred_ann_outer)
+y_pred_linear_outer = np.array(y_pred_linear_outer)
+y_pred_baseline_outer = np.array(y_pred_baseline_outer)
+
+mean_diff_ann_linear, CI_ann_linear, p_value_ann_linear = ttest_twomodels(y_true_outer, y_pred_ann_outer, y_pred_linear_outer)
+print("ANN vs Linear Regression:")
+print(f"Mean difference: {mean_diff_ann_linear:.4f}")
+print(f"Confidence interval: {CI_ann_linear}")
+print(f"P-value: {p_value_ann_linear:.4f}")
+
+mean_diff_linear_base, CI_linear_base, p_value_linear_base = ttest_twomodels(y_true_outer, y_pred_linear_outer, y_pred_baseline_outer)
+print("Linear Regression vs Baseline:")
+print(f"Mean difference: {mean_diff_linear_base:.4f}")
+print(f"Confidence interval: {CI_linear_base}")
+print(f"P-value: {p_value_linear_base:.4f}")
+
+mean_diff_ANN_base, CI_ANN_base, p_value_ANN_base = ttest_twomodels(y_true_outer, y_pred_ann_outer, y_pred_baseline_outer)
+print("ANN vs Baseline:")
+print(f"Mean difference: {mean_diff_ANN_base:.4f}")
+print(f"Confidence interval: {CI_ANN_base}")
+print(f"P-value: {p_value_ANN_base:.4f}")
