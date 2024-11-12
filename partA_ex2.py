@@ -77,7 +77,6 @@ glass_identification = fetch_ucirepo(id=42)
 x = glass_identification.data.features
 target = glass_identification.data.targets
 attributeNames = ["Na", "Mg", "Al", "Si", "K", "Ca", "Ba", "Fe"]
-
 # Transform data to achieve that each column has mean 0 and standard deviation 1.
 scaler = StandardScaler()
 x_trans = pd.DataFrame(scaler.fit_transform(x), columns=x.columns)
@@ -86,11 +85,17 @@ x_trans = pd.DataFrame(scaler.fit_transform(x), columns=x.columns)
 predict_idx = 0
 y = x_trans.iloc[:, predict_idx]
 
-X_cols = list(range(0, predict_idx)) + list(range(predict_idx + 1, len(attributeNames)))
+X_cols = list(range(0, predict_idx)) + list(range(predict_idx + 1, len(attributeNames)+1))
 X = x_trans.iloc[:, X_cols]
+#to convert to the correct format ==> array
 X = X.to_numpy()
 y = y.to_numpy()
 N, M = X.shape
+
+# Add offset attribute
+X = np.concatenate((np.ones((X.shape[0], 1)), X), 1)
+attributeNames = ["Offset"] + attributeNames
+M = M + 1
 
 ## Crossvalidation
 # Create crossvalidation partition for evaluation
@@ -98,7 +103,7 @@ K = 10
 CV = model_selection.KFold(K, shuffle=True)
 
 # Values of lambda
-exponents = np.linspace(-5, 8, num=50) 
+exponents = np.linspace(-3, 8, num=50) 
 lambdas = np.power(10.0, exponents)
 #lambdas = np.power(10.0, range(-10, 10))
 
@@ -156,13 +161,9 @@ for train_index, test_index in CV.split(X, y):
         np.square(y_test - y_test.mean()).sum(axis=0) / y_test.shape[0]
     )
 
-    # Trainagoing th best model: Estimate weights for the optimal value of lambda, on entire training set
     lambdaI = opt_lambda * np.eye(M)
     lambdaI[0, 0] = 0  # Do no regularize the bias term
-    model_rlr = lm.LinearRegression().fit(XtX + lambdaI, Xty)
-    w_rlr[:, k] = model_rlr.coef_
-
-    #w_rlr[:, k] = np.linalg.solve(XtX + lambdaI, Xty).squeeze()
+    w_rlr[:, k] = np.linalg.solve(XtX + lambdaI, Xty).squeeze()
     # Compute mean squared error with regularization with optimal lambda
     Error_train_rlr[k] = (
         np.square(y_train - X_train @ w_rlr[:, k]).sum(axis=0) / y_train.shape[0]
@@ -171,12 +172,9 @@ for train_index, test_index in CV.split(X, y):
         np.square(y_test - X_test @ w_rlr[:, k]).sum(axis=0) / y_test.shape[0]
     )
 
-    #retrain the linear model
-    model = lm.LinearRegression().fit(XtX, Xty)
-    w_noreg[:, k] = model.coef_
-    m = lm.LinearRegression().fit(XtX, Xty) # model retrained in the train data set
-    #Error_train[k] = np.square(y_train-m.predict(X_train)).sum()/y_train.shape[0]
-    #Error_test[k] = np.square(y_test-m.predict(X_test)).sum()/y_test.shape[0]
+    # Estimate weights for unregularized linear regression, on entire training set
+    w_noreg[:, k] = np.linalg.solve(XtX, Xty).squeeze()
+    # Compute mean squared error without regularization
     Error_train[k] = (
         np.square(y_train - X_train @ w_noreg[:, k]).sum(axis=0) / y_train.shape[0]
     )
@@ -186,13 +184,12 @@ for train_index, test_index in CV.split(X, y):
 
     # Display the results for the last cross-validation fold
     if k == K - 1:
-        print(E_gen_outer)
-        print(Error_test)
         figure(k, figsize=(12, 8))
         subplot(1, 3, 1)
         semilogx(lambdas, mean_w_vs_lambda.T[:, 1:], ".-")  # Don't plot the bias term
         xlabel("Regularization factor")
         ylabel("Mean Coefficient Values")
+        #legend("Na", "Mg", "Al", "Si", "K", "Ca", "Ba", "Fe")
         grid()
 
         subplot(1, 3, 2)
@@ -215,9 +212,13 @@ for train_index, test_index in CV.split(X, y):
         ylabel('Squared error (crossvalidation)')
         legend()
         grid(True)
-        print("weights for optimal lambda:")
-        print(w_rlr)
         show()
+        #results for optimal lambda
+        index = np.where(lambdas == opt_lambda)[0][0]
+        optimal_weights = mean_w_vs_lambda.T[index, :] #bias + atributes weights
+        print(optimal_weights)
+        print(index)
+
     k += 1
 
 show()
