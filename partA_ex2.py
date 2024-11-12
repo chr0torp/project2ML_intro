@@ -159,7 +159,10 @@ for train_index, test_index in CV.split(X, y):
     # Trainagoing th best model: Estimate weights for the optimal value of lambda, on entire training set
     lambdaI = opt_lambda * np.eye(M)
     lambdaI[0, 0] = 0  # Do no regularize the bias term
-    w_rlr[:, k] = np.linalg.solve(XtX + lambdaI, Xty).squeeze()
+    model_rlr = lm.LinearRegression().fit(XtX + lambdaI, Xty)
+    w_rlr[:, k] = model_rlr.coef_
+
+    #w_rlr[:, k] = np.linalg.solve(XtX + lambdaI, Xty).squeeze()
     # Compute mean squared error with regularization with optimal lambda
     Error_train_rlr[k] = (
         np.square(y_train - X_train @ w_rlr[:, k]).sum(axis=0) / y_train.shape[0]
@@ -168,12 +171,18 @@ for train_index, test_index in CV.split(X, y):
         np.square(y_test - X_test @ w_rlr[:, k]).sum(axis=0) / y_test.shape[0]
     )
 
-    # Estimate weights for unregularized linear regression, on entire training set
-    w_noreg[:, k] = np.linalg.solve(XtX, Xty).squeeze()
-    # OR ALTERNATIVELY: you can use sklearn.linear_model module for linear regression:
-    m = lm.LinearRegression().fit(X_train, y_train) # model retrained in the train data set
-    Error_train[k] = np.square(y_train-m.predict(X_train)).sum()/y_train.shape[0]
-    Error_test[k] = np.square(y_test-m.predict(X_test)).sum()/y_test.shape[0]
+    #retrain the linear model
+    model = lm.LinearRegression().fit(XtX, Xty)
+    w_noreg[:, k] = model.coef_
+    m = lm.LinearRegression().fit(XtX, Xty) # model retrained in the train data set
+    #Error_train[k] = np.square(y_train-m.predict(X_train)).sum()/y_train.shape[0]
+    #Error_test[k] = np.square(y_test-m.predict(X_test)).sum()/y_test.shape[0]
+    Error_train[k] = (
+        np.square(y_train - X_train @ w_noreg[:, k]).sum(axis=0) / y_train.shape[0]
+    )
+    Error_test[k] = (
+        np.square(y_test - X_test @ w_noreg[:, k]).sum(axis=0) / y_test.shape[0]
+    )
 
     # Display the results for the last cross-validation fold
     if k == K - 1:
@@ -206,6 +215,8 @@ for train_index, test_index in CV.split(X, y):
         ylabel('Squared error (crossvalidation)')
         legend()
         grid(True)
+        print("weights for optimal lambda:")
+        print(w_rlr)
         show()
     k += 1
 
