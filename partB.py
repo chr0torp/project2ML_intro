@@ -12,7 +12,7 @@ import sklearn.linear_model as lm
 
 # ANN
 import torch
-from dtuimldmtools import (train_neural_net, mcnemar, ttest_twomodels)
+from dtuimldmtools import (train_neural_net, ttest_twomodels)
 
 # fetch dataset 
 glass_identification = fetch_ucirepo(id=42) 
