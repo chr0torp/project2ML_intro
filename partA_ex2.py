@@ -103,7 +103,7 @@ K = 10
 CV = model_selection.KFold(K, shuffle=True)
 
 # Values of lambda
-exponents = np.linspace(-3, 8, num=50) 
+exponents = np.linspace(-10, 10, num=50) 
 lambdas = np.power(10.0, exponents)
 #lambdas = np.power(10.0, range(-10, 10))
 
@@ -213,11 +213,33 @@ for train_index, test_index in CV.split(X, y):
         legend()
         grid(True)
         show()
+        figure(k, figsize=(12, 8))
+        subplot(1, 2, 1)
+        semilogx(lambdas, mean_w_vs_lambda.T[:, 1:], ".-")  # Don't plot the bias term
+        xlabel("Regularization factor")
+        ylabel("Mean Coefficient Values")
+        #legend("Na", "Mg", "Al", "Si", "K", "Ca", "Ba", "Fe")
+        grid()
+
+        subplot(1, 2, 2)
+        title("Optimal lambda: 1e{0}".format(np.log10(opt_lambda)))
+        loglog(
+            lambdas, train_err_vs_lambda.T, "b.-", lambdas, test_err_vs_lambda.T, "r.-",lambdas, gen_err_vs_lambda.T, "g.-"
+        )
+        xlabel("Regularization factor")
+        ylabel("Squared error (crossvalidation)")
+        legend(["Train error", "Validation error", "Generalization error"])
+        grid()
+        
+        grid(True)
+        show()
         #results for optimal lambda
         index = np.where(lambdas == opt_lambda)[0][0]
-        optimal_weights = mean_w_vs_lambda.T[index, :] #bias + atributes weights
+        optimal_weights = mean_w_vs_lambda.T[index, :]
         print(optimal_weights)
-        print(index)
+        print("Optimal lambda:")
+        print(np.log10(opt_lambda))
+        print(opt_lambda)
 
     k += 1
 
